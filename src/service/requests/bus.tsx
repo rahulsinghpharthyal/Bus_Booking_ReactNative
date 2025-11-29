@@ -3,7 +3,7 @@ import apiClient from '../apiClient';
 interface BookTicketData {
   busId: string;
   date: string;
-  seatNumbers: number;
+  seatNumbers: number[];
 }
 
 export const fetchBuses = async (from: string, to: string, date: string) => {

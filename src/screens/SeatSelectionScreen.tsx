@@ -3,12 +3,14 @@ import React, { useCallback, useState } from 'react'
 import { bookTicket, fetchBusDetails } from '../service/requests/bus';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ActivityIndicator, Alert, ScrollView, Text, Touchable, TouchableOpacity, View } from 'react-native';
-import { goBack, resetAndNavigate } from '../utils/NavigationUtils';
+import { goBack, navigate, resetAndNavigate } from '../utils/NavigationUtils';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeftIcon, StarIcon } from 'react-native-heroicons/solid';
 import TicketModal from '../components/ui/TicketModal';
 import PaymentButton from '../components/ui/PaymentButton';
 import Seat from '../components/ui/Seat';
+import { createOrder, verifyOrder } from '../service/requests/payment';
+import { openRazorpayCheckout } from '../service/requests/razorpay';
 
 const SeatSelectionScreen = () => {
     const [ticketVisible, setTicketVisible] = useState(false);
@@ -32,7 +34,7 @@ const SeatSelectionScreen = () => {
     const bookTicketMutation = useMutation({
         mutationFn: (ticketData: {
             busId: string;
-            date: string,
+            date: string;
             seatNumbers: number[];
         }) => bookTicket(ticketData),
         onSuccess: busInfo => {
@@ -53,18 +55,47 @@ const SeatSelectionScreen = () => {
         );
     };
 
-    const handleOnPay = () => {
+    const createOrderMutaion = useMutation({
+        mutationFn: (amount: number)=> createOrder(amount),
+        onSuccess: async (orderData) => {
+            console.log(`Order created succesfully`, orderData);
+            const result = await openRazorpayCheckout(orderData);
+
+            verifyPaymentMutation.mutate(result);
+        },
+        onError: error => {
+            console.log("Payment Error", "Failed to create order", error.message)
+        }
+    });
+
+    const verifyPaymentMutation = useMutation({
+        mutationFn: (verifyData: {
+            razorpay_signature: string;
+            razorpay_order_id: string;
+            razorpay_payment_id: string;
+        }) => verifyOrder(verifyData),
+        onSuccess: (data) => {
+            console.log('Payment verification succesfull.')
+            bookTicketMutation.mutate({
+            busId,
+            seatNumbers: selectedSeats,
+            date: new Date(busInfo.departureTime).toISOString(),
+        })
+        },
+        onError: (error) => {
+            console.log('Payment verification failed.')
+            navigate('PaymentFailedScreen');
+        }
+    })
+
+    const handleOnPay = async () => {
         if(selectedSeats.length === 0){
             Alert.alert('Please select at least one seat.');
             return;
         }
-
-        bookTicketMutation.mutate({
-            busId,
-            date: new Date(busInfo.departureTime).toISOString(),
-            seatNumbers: selectedSeats
-        })
+        createOrderMutaion.mutate(busInfo.price);
     }
+
 
 
     if(isLoading){
