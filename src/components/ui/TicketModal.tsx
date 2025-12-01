@@ -23,6 +23,7 @@ interface TicketModalProps {
 // export default TicketModal
 
 const TicketModal = ({visible, onClose, bookingInfo}: TicketModalProps) => {
+    console.log('this is bokking info', bookingInfo)
   return (
     <Modal visible={visible} animationType="slide" transparent>
         <View
